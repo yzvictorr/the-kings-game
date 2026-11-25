@@ -3358,7 +3358,7 @@ function tickClocks() {
 }
 
 /* ---------- componentes ---------- */
-function hid() { return !!S && (S.settings.hide === "sempre" || (S.settings.hide === "leilao" && ["auction", "wc", "lottery", "draft"].includes(S.phase))); }
+function hid() { return !!S && (S.settings.hide === "sempre" || (S.settings.hide === "leilao" && ["auction", "wc", "lottery", "draft", "staff"].includes(S.phase))); }
 function O(p) { return hid() ? "?" : p.o; }
 let CREST_N = 0;
 function starPts(cx, cy, R, r, n) { const a = []; for (let i = 0; i < n * 2; i++) { const g = -Math.PI / 2 + i * Math.PI / n, q = i % 2 ? r : R; a.push((cx + Math.cos(g) * q).toFixed(1) + "," + (cy + Math.sin(g) * q).toFixed(1)); } return a.join(" "); }
@@ -4147,10 +4147,10 @@ function viewAuction() {
 /* ---------- mercado de staff ---------- */
 function staffCard(x) {
   return `<div class="pcard" style="background:linear-gradient(160deg,#16243a,#0b1220);border-color:#2c4a73"><div class="crown">${CROWN}</div>
-    <div class="row" style="justify-content:space-between;align-items:flex-start"><div><div class="pos" style="font-size:16px;color:var(--blue)">${x.k === "tec" ? "TÉCNICO" : "PRESIDENTE"}</div></div><div class="num muted" style="text-align:right;font-size:13px">VALOR REF.<br><b style="font-size:24px;color:var(--ink)">${x.v}</b></div></div>
+    <div class="row" style="justify-content:space-between;align-items:flex-start"><div><div class="pos" style="font-size:16px;color:var(--blue)">${x.k === "tec" ? "TÉCNICO" : "PRESIDENTE"}</div></div><div class="num muted" style="text-align:right;font-size:13px">VALOR REF.<br><b style="font-size:24px;color:var(--ink)">${hid() ? "?" : x.v}</b></div></div>
     ${staffPortrait(x)}
     <div class="nm">${esc(x.n)}</div><div class="club">${esc(x.club)}</div>
-    <div class="st">${x.k === "tec" ? `<div><b>${x.form}</b>formação</div><div><b style="font-size:14px">${STYLES[x.style].n}</b>estilo</div><div><b>+${x.r}</b>nível</div>` : `<div><b>${x.pen}</b>pênalti</div><div></div><div></div>`}</div></div>`;
+    <div class="st">${x.k === "tec" ? `<div><b>${x.form}</b>formação</div><div><b style="font-size:14px">${STYLES[x.style].n}</b>estilo</div><div><b>${hid() ? "?" : "+" + x.r}</b>nível</div>` : `<div><b>${hid() ? "?" : x.pen}</b>pênalti</div><div></div><div></div>`}</div>${hid() ? `<div class="muted" style="font-size:11px">Modo overall escondido: use o histórico de pênaltis e o clube como pista.</div>` : ""}</div>`;
 }
 function viewStaff() {
   const a = S.staffA, lot = a.lot, mi = myMi();
@@ -4162,7 +4162,7 @@ function viewStaff() {
       <div class="row" style="justify-content:space-between"><span class="phase">Staff ${lot.n} de ${a.total}</span></div>
       <div class="bidnow"><div class="amt num ${bidPop(lot)}">${lot.bid || "–"}</div><div class="who"><div class="muted" style="font-size:12px">${lot.bidder >= 0 ? "LANCE ATUAL" : "SEM LANCES · comece com 1"}</div>${lot.bidder >= 0 ? mgrName(lot.bidder) : ""}</div><div class="spacer"></div><div class="clock num" id="sclock">–</div></div>
       <div class="bar"><i id="sclockbar" style="width:100%"></i></div>
-      <p class="muted" style="margin:0;font-size:13px">${x.k === "tec" ? `Bônus quando o time joga no ${x.form} e/ou no estilo ${STYLES[x.style].n}.` : `Ele cobra o pênalti presidente do seu time. ${penHist(x)} Nota de pênalti <b>${x.pen}</b>: ${penInfo(x.pen)}`}</p>
+      <p class="muted" style="margin:0;font-size:13px">${x.k === "tec" ? `Bônus quando o time joga no ${x.form} e/ou no estilo ${STYLES[x.style].n}.` : `Ele cobra o pênalti presidente do seu time. ${penHist(x)}${hid() ? "" : ` Nota de pênalti <b>${x.pen}</b>: ${penInfo(x.pen)}`}`}</p>
       ${bidders.map(bi => { const m = S.managers[bi], mx = staffMax(S, m), lead = lot.bidder === bi, ps = lot.passed.includes(bi); return `<div style="display:grid;gap:6px;border-top:1px solid var(--line);padding-top:10px"><div>${mgrName(bi)} <span class="muted">· saldo ${m.budget} · máx ${mx}</span></div>
         <div class="bidbtns">${[1, 2, 5].filter(s => lot.bid + s <= mx).map(s => `<button class="btn ${s === 1 ? "gold" : ""}" data-a="bid" data-mi="${bi}" data-amt="${lot.bid + s}" ${lead || ps ? "disabled" : ""}>+${s} <span class="num">(${lot.bid + s})</span></button>`).join("")}<button class="btn ghost" data-a="pass" data-mi="${bi}" ${lead || ps ? "disabled" : ""}>Passar</button></div></div>`; }).join("")}
     </div></div>`;
@@ -4563,7 +4563,7 @@ function teamView() {
     <div class="card" style="display:grid;gap:10px;align-content:start">
       <h3 style="font-size:22px">Escalação · ${esc(m.team)}</h3>
       ${m.coach ? (() => { const c = STAFF_BY_ID[m.coach]; const f1 = tac.form === c.form, f2 = tac.style === c.style; return `<div class="flash" style="border-color:${f1 && f2 ? "var(--pitch)" : "var(--line)"};background:transparent;font-size:13.5px">Técnico <b>${esc(c.n)}</b> prefere <b>${c.form}</b> ${f1 ? "✓" : "✗"} e <b>${STYLES[c.style].n}</b> ${f2 ? "✓" : "✗"}. ${f1 && f2 ? "Encaixe perfeito: bônus máximo!" : f1 || f2 ? "Encaixe parcial: bônus menor." : "Sem bônus de preleção."}</div>`; })() : ""}
-      ${m.pres ? `<div class="muted" style="font-size:13px">Presidente: <b style="color:var(--ink)">${esc(STAFF_BY_ID[m.pres].n)}</b> (pênalti ${STAFF_BY_ID[m.pres].pen}) cobra o pênalti presidente.</div>` : ""}
+      ${m.pres ? `<div class="muted" style="font-size:13px">Presidente: <b style="color:var(--ink)">${esc(STAFF_BY_ID[m.pres].n)}</b> ${hid() ? "" : `(pênalti ${STAFF_BY_ID[m.pres].pen})`} cobra o pênalti presidente.</div>` : ""}
       <div class="grid2" style="gap:10px">
         <label class="f" for="t-form">Formação<select id="t-form" data-mi="${mi}">${Object.keys(FORMS).map(f => `<option ${f === tac.form ? "selected" : ""}>${f}</option>`).join("")}</select></label>
         <label class="f" for="t-style">Estilo de jogo<select id="t-style" data-mi="${mi}">${Object.entries(STYLES).map(([k, v]) => `<option value="${k}" ${k === tac.style ? "selected" : ""}>${v.n}</option>`).join("")}</select></label>
