@@ -2055,9 +2055,11 @@ const REACTS = ["🔥", "😂", "😱", "👏", "😡", "👑"];
 const SRV = { cfg: {}, cfgAt: 0, orig: null, cur: null };
 function srvApplyOvr() {
   if (!SRV.orig) { SRV.orig = {}; PLAYERS.forEach(p => { SRV.orig[p.id] = { o: p.o, at: p.at, df: p.df, pot: p.pot, v: p.v }; }); }
-  PLAYERS.forEach(p => { const b = SRV.orig[p.id], x = (SRV.cfg.ovr || {})[p.id]; Object.assign(p, b); if (x) { ["o", "at", "df", "pot"].forEach(k => { if (x[k] != null) p[k] = x[k]; }); p.v = Math.max(1, Math.round(1.25 * Math.exp((p.o - 64) * 0.13))); if (p.pot < p.o) p.pot = p.o; } });
+  PLAYERS.forEach(p => { const b = SRV.orig[p.id], x = (SRV.cfg.ovr || {})[p.id]; Object.assign(p, b); if (x) { ["o", "at", "df", "pot"].forEach(k => { if (x[k] != null) p[k] = x[k]; }); ovrShift(p, b, x); p.v = Math.max(1, Math.round(1.25 * Math.exp((p.o - 64) * 0.13))); if (p.pot < p.o) p.pot = p.o; } });
   SRV.cur = null; // força recalcular a evolução da sala atual
 }
+// mudou só o over? ataque e defesa acompanham (senão um 99 de over jogaria igual ao original)
+function ovrShift(p, b, x) { if (x.o == null) return; const d = x.o - b.o; if (x.at == null) p.at = Math.max(20, Math.min(99, b.at + d)); if (x.df == null) p.df = Math.max(20, Math.min(99, b.df + d)); }
 async function srvLoadCfg(force) {
   if (!force && Date.now() - SRV.cfgAt < 600000) return;
   SRV.cfgAt = Date.now();
@@ -2169,6 +2171,11 @@ export class Room {
     if (m.t === "bye") { this.bye[pid] = true; this.awayChk = 0; return; }
     if (m.t === "ev") { this.sendEv(ws, String(m.fid)); return; }
     if (m.t === "full") { this.sendLive(ws, true); return; }
+    if (m.t === "cfg") { // o administrador salvou ajustes: recarrega e avisa todo mundo da sala na hora
+      if (t - (this.cfgAt || 0) < 1500) return; this.cfgAt = t;
+      srvLoadCfg(true).then(() => { SRV.cur = null; this.all({ t: "cfg", ovr: SRV.cfg.ovr || {}, msg: SRV.cfg.msg || null }); this.writeLive(true); }).catch(() => { });
+      return;
+    }
     if (m.t === "fullS") { if (this.dirty) this.sendS(t); this.send(ws, { t: "S", S: R.S }); return; }
     if (m.t === "in") { this.intents(pid, Array.isArray(m.q) ? m.q : [m]); return; }
   }

@@ -2579,6 +2579,7 @@ function accountInit() {
 }
 async function onUser(u) {
   ACC.user = u;
+  if (PLAYERS_ORIG) applyOvr(); // o administrador vê os ajustes secretos; os outros, não
   if (!S) MYPID = u ? "g" + u.uid : ANON_PID; // com login, você é o mesmo presidente em qualquer aparelho
   ACC.prof = null;
   if (u) {
@@ -3059,6 +3060,7 @@ function srvMsg(m) {
     applyRemoteLive({ ms: JSON.parse(JSON.stringify(ms)), hostNow: m.hostNow });
     return;
   }
+  if (m.t === "cfg") { ADMIN_CFG = Object.assign({}, ADMIN_CFG, { ovr: m.ovr || {}, msg: m.msg }); applyOvr(); render(); try { renderLive(true); } catch (e) { } return; }
   if (m.t === "ev") { EVS[m.fid] = m.ev; const w = (NET.evWait || {})[m.fid]; if (w) { delete NET.evWait[m.fid]; w(m.ev); } return; }
   if (m.t === "nf") { if (NET.srvOnS) { srvClose(); NET.mode = "none"; NET.code = null; UI.busy = false; UI.homeErr = `Não achei a sala ${NET.tryCode || ""}. Confira o código com quem criou.`; render(); } return; }
   if (m.t === "taken") { srvClose(); srvCreate(store("kl_name") || "Presidente", store("kl_team") || "Meu Time FC"); return; }
@@ -3677,13 +3679,14 @@ let ADMIN_CFG = {}, PLAYERS_ORIG = null;
 function valueOf(o) { return Math.max(1, Math.round(1.25 * Math.exp((o - 64) * 0.13))); }
 function applyOvr() {
   if (!PLAYERS_ORIG) { PLAYERS_ORIG = {}; PLAYERS.forEach(p => { PLAYERS_ORIG[p.id] = { o: p.o, at: p.at, df: p.df, pot: p.pot, v: p.v }; }); }
-  PLAYERS.forEach(p => { const b = PLAYERS_ORIG[p.id], x = (ADMIN_CFG.ovr || {})[p.id]; Object.assign(p, b); if (x) { ["o", "at", "df", "pot"].forEach(k => { if (x[k] != null) p[k] = x[k]; }); p.v = valueOf(p.o); if (p.pot < p.o) p.pot = p.o; } });
+  PLAYERS.forEach(p => { const b = PLAYERS_ORIG[p.id]; let x = (ADMIN_CFG.ovr || {})[p.id]; if (x && x.sec && !isAdmin()) x = null; Object.assign(p, b); if (x) { ["o", "at", "df", "pot"].forEach(k => { if (x[k] != null) p[k] = x[k]; }); if (x.o != null) { const d = x.o - b.o; if (x.at == null) p.at = Math.max(20, Math.min(99, b.at + d)); if (x.df == null) p.df = Math.max(20, Math.min(99, b.df + d)); } p.v = valueOf(p.o); if (p.pot < p.o) p.pot = p.o; } });
   try { setPov(S && S.pov); } catch (e) { }
 }
 async function saveAdminCfg(patch) {
   const { db } = await getCaps(); if (!db || !isAdmin()) throw new Error("sem permissão");
   const ref = db.doc("admin/cfg"); const d = await ref.get(); const cur = (d.exists ? d.data() : null) || {};
   const nx = Object.assign({}, cur, patch); await ref.set(nx); ADMIN_CFG = nx; applyOvr();
+  if (NET.srv) srvSend({ t: "cfg" }); // sala na nuvem: o servidor e todo mundo da sala recebem na hora
 }
 function adminNotice() { const m = ADMIN_CFG.msg; return m && m.on && m.txt ? `<div class="card notice">📣 ${esc(m.txt)}</div>` : ""; }
 function shrinkImage(file) { // recorta no centro e reduz para 160x160 JPEG (uns 8 KB)
@@ -3716,13 +3719,13 @@ function viewAdminOver() {
   const cell = (p, k) => { const v = ed[p.id] && ed[p.id][k] != null ? ed[p.id][k] : p[k], orig = PLAYERS_ORIG ? PLAYERS_ORIG[p.id][k] : p[k]; return `<td><input type="number" min="${k === "at" || k === "df" ? 30 : 50}" max="99" class="ovin ${v !== orig ? "chg" : ""}" data-id="${p.id}" data-k="${k}" value="${v}" title="original: ${orig}"></td>`; };
   return `<div class="sec-title"><h2>Ajustar overall</h2><button class="btn sm ghost" data-a="profileclose">← Voltar</button></div>
   <div class="card" style="display:grid;gap:10px">
-    <p class="muted" style="margin:0;font-size:13px">O valor ajustado vale para todo mundo. Salas novas já começam com ele; em salas que já estão rolando passa a valer quando a página for recarregada. O valor de leilão acompanha o overall. Passe o mouse no número para ver o original. ${Object.keys(ov).length} jogador${Object.keys(ov).length === 1 ? "" : "es"} ajustado${Object.keys(ov).length === 1 ? "" : "s"}.</p>
+    <p class="muted" style="margin:0;font-size:13px">O valor ajustado vale para todo mundo. Marque 🤫 para um ajuste secreto: o jogo usa, mas os outros jogadores continuam vendo o over normal. Salas novas já começam com ele; em salas que já estão rolando passa a valer quando a página for recarregada. O valor de leilão acompanha o overall. Passe o mouse no número para ver o original. ${Object.keys(ov).length} jogador${Object.keys(ov).length === 1 ? "" : "es"} ajustado${Object.keys(ov).length === 1 ? "" : "s"}.</p>
     <div class="row"><input id="ad-q" type="text" placeholder="Buscar jogador" value="${esc(UI.adq || "")}" style="max-width:220px">
       <select id="ad-team" style="max-width:220px"><option value="">Todos os times</option>${clubs.map(c => `<option value="${esc(c)}" ${c === tm ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>
       <select id="ad-ch" style="max-width:200px"><option value="0" ${UI.adch !== "1" ? "selected" : ""}>Todos</option><option value="1" ${UI.adch === "1" ? "selected" : ""}>Só os ajustados</option></select>
       <span class="spacer"></span><button class="btn sm gold" data-a="ovrsave" ${nEd ? "" : "disabled"}>Salvar ${nEd ? nEd + " alteraç" + (nEd === 1 ? "ão" : "ões") : "alterações"}</button></div>
-    <div class="scroll" id="ad-ovlist" style="max-height:560px"><table class="tbl"><thead><tr><th>Jogador</th><th>Pos</th><th>Time</th><th>OVR</th><th>ATQ</th><th>DEF</th><th>POT</th><th></th></tr></thead><tbody>
-    ${list.slice(0, 250).map(p => `<tr><td><b>${esc(p.n)}</b></td><td>${posb(p.p, p.p2)}</td><td class="muted">${esc(p.t)}</td>${cell(p, "o")}${cell(p, "at")}${cell(p, "df")}${cell(p, "pot")}<td>${ov[p.id] ? `<button class="btn sm ghost" data-a="ovrreset" data-id="${p.id}" title="Voltar ao original">↺</button>` : ""}</td></tr>`).join("")}</tbody></table></div>
+    <div class="scroll" id="ad-ovlist" style="max-height:560px"><table class="tbl"><thead><tr><th>Jogador</th><th>Pos</th><th>Time</th><th>OVR</th><th>ATQ</th><th>DEF</th><th>POT</th><th title="Secreto: só o jogo usa; os outros jogadores continuam vendo o over normal">🤫</th><th></th></tr></thead><tbody>
+    ${list.slice(0, 250).map(p => `<tr><td><b>${esc(p.n)}</b></td><td>${posb(p.p, p.p2)}</td><td class="muted">${esc(p.t)}</td>${cell(p, "o")}${cell(p, "at")}${cell(p, "df")}${cell(p, "pot")}<td><input type="checkbox" class="ovsec" data-id="${p.id}" ${(ed[p.id] && ed[p.id].sec != null ? ed[p.id].sec : ov[p.id] && ov[p.id].sec) ? "checked" : ""} title="Secreto: só o jogo usa; os outros jogadores continuam vendo o over normal"></td><td>${ov[p.id] ? `<button class="btn sm ghost" data-a="ovrreset" data-id="${p.id}" title="Voltar ao original">↺</button>` : ""}</td></tr>`).join("")}</tbody></table></div>
   </div>`;
 }
 function viewAdminMsg() {
@@ -4798,7 +4801,7 @@ document.addEventListener("click", e => {
   if (a === "profileclose") { UI.page = null; return render(true); }
   if (a === "adminpage") { UI.page = "admin"; window.scrollTo(0, 0); return render(true); }
   if (a === "adsec") { UI.adsec = b.dataset.v; UI.adq = ""; UI.adteam = ""; return render(true); }
-  if (a === "ovrsave") { const ov = Object.assign({}, ADMIN_CFG.ovr || {}); Object.entries(UI.ovrEd || {}).forEach(([id, x]) => { const o0 = PLAYERS_ORIG[id], cur = Object.assign({}, ov[id] || {}, x), diff = {}; Object.keys(cur).forEach(k => { if (cur[k] !== o0[k]) diff[k] = cur[k]; }); if (Object.keys(diff).length) ov[id] = diff; else delete ov[id]; }); saveAdminCfg({ ovr: ov }).then(() => { UI.ovrEd = {}; toast("Overall salvo! Já vale para as salas novas."); render(true); }).catch(() => toast("Não consegui salvar (sem permissão ou sem internet).")); return; }
+  if (a === "ovrsave") { const ov = Object.assign({}, ADMIN_CFG.ovr || {}); Object.entries(UI.ovrEd || {}).forEach(([id, x]) => { const o0 = PLAYERS_ORIG[id], cur = Object.assign({}, ov[id] || {}, x), diff = {}; Object.keys(cur).forEach(k => { if (k === "sec") return; if (cur[k] !== o0[k]) diff[k] = cur[k]; }); if (Object.keys(diff).length) { if (cur.sec) diff.sec = true; ov[id] = diff; } else delete ov[id]; }); saveAdminCfg({ ovr: ov }).then(() => { UI.ovrEd = {}; toast("Overall salvo! Já vale para as salas novas."); render(true); }).catch(() => toast("Não consegui salvar (sem permissão ou sem internet).")); return; }
   if (a === "ovrreset") { const ov = Object.assign({}, ADMIN_CFG.ovr || {}); delete ov[b.dataset.id]; if (UI.ovrEd) delete UI.ovrEd[b.dataset.id]; saveAdminCfg({ ovr: ov }).then(() => { toast("Voltou ao overall original."); render(true); }).catch(() => toast("Não consegui salvar.")); return; }
   if (a === "msgsave") { const txt = (($("#ad-msg") || {}).value || "").trim().slice(0, 240), on = b.dataset.on === "1"; saveAdminCfg({ msg: { txt, on: on && !!txt, at: Date.now() } }).then(() => { toast(on ? "Aviso publicado!" : "Aviso retirado."); render(true); }).catch(() => toast("Não consegui salvar.")); return; }
   if (a === "defsave") { const g = id => ($("#" + id) || {}).value; const d = { mode: g("df-mode"), fmt: g("df-fmt"), inj: g("df-inj"), budget: +g("df-budget"), squad: +g("df-squad"), timer: +g("df-timer"), total: +g("df-total"), hide: g("df-hide"), career: g("df-career") === "1" }; saveAdminCfg({ defaults: d }).then(() => { toast("Padrões salvos para as salas novas."); render(true); }).catch(() => toast("Não consegui salvar.")); return; }
@@ -4904,6 +4907,7 @@ document.addEventListener("input", e => {
 document.addEventListener("change", e => {
   const el = e.target, id = el.id;
   if (id === "loadsave" && el.files && el.files[0]) return importSave(el.files[0]);
+  if (el.classList && el.classList.contains("ovsec")) { UI.ovrEd = UI.ovrEd || {}; (UI.ovrEd[el.dataset.id] = UI.ovrEd[el.dataset.id] || {}).sec = el.checked; const n = Object.keys(UI.ovrEd).length, b = document.querySelector('[data-a="ovrsave"]'); if (b) { b.disabled = !n; b.textContent = "Salvar " + n + " alteraç" + (n === 1 ? "ão" : "ões"); } return; }
   if (el.classList && el.classList.contains("ovin")) { // ajuste de over: atualiza só a célula, sem redesenhar a tela (não perde o lugar da lista)
     const pid = el.dataset.id, k = el.dataset.k, v = Math.max(k === "at" || k === "df" ? 30 : 50, Math.min(99, Math.round(+el.value || 0)));
     UI.ovrEd = UI.ovrEd || {}; (UI.ovrEd[pid] = UI.ovrEd[pid] || {})[k] = v; if (+el.value !== v) el.value = v;
