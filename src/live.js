@@ -41,6 +41,7 @@ function renderLive(force) {
   $("#l-host").innerHTML = (host && M.status === "playing" ? `${[1, 2, 4].map(s => `<button class="btn sm ${(M.speed || 1) === s ? "gold" : ""}" data-a="lspeed" data-v="${s}">${s}x</button>`).join("")}
     <button class="btn sm" data-a="lpause">${M.paused ? "Continuar" : "Pausar"}</button><button class="btn sm ghost" data-a="lff">Simular até o fim</button>` : "")
     + (LV.lastGoal ? `<button class="btn sm" data-a="replay" title="Rever o último gol">▶ Replay: ${esc(shortName(LV.lastGoal.who || "gol"))}</button>` : "")
+    + (isAdmin() ? `<button class="btn sm ghost" data-a="liveadm" title="Abrir a tela do administrador sem sair da partida">⚙️ Adm</button>` : "")
     + `<button class="btn sm ghost" data-a="hidelive">${M.status === "done" ? "Fechar" : "Minimizar"}</button>`;
   const ph = phaseLabel(M);
   const mm = Math.floor(M.min), ss = Math.round((M.min - mm) * 60);
