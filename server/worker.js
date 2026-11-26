@@ -971,7 +971,7 @@ function botKeep(S, mi) {
 function keepSubmit(S, mi, k) {
   if (S.phase !== "keep") return false;
   const m = S.managers[mi], ros = new Set(m.roster);
-  const wc = (k.wc || []).map(Number), keep = (k.keep || []).map(Number);
+  const wc = (k.wc || []).map(Number).filter(id => ros.has(id)), keep = (k.keep || []).map(Number).filter(id => ros.has(id)); // ignora quem já não está no elenco
   const all = wc.concat(keep);
   if (new Set(all).size !== all.length || !all.every(id => ros.has(id)) || wc.length > S.keep.maxWC || keep.length > S.keep.maxKeep) return false;
   S.keep.sub[mi] = { wc, keep };

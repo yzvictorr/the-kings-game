@@ -39,3 +39,10 @@ console.log("ok v19");
   const A = run(true); ok(A.pending && A.pending.k === "pen" && A.pending.team === 1 && A.t[1].cards[0].used, "roubou: pênalti vai para quem tinha o coringa");
   const B = run(false); ok(B.pending && B.pending.k === "pen" && B.pending.team === 0 && !B.t[1].cards[0].used, "não roubou: carta segue com quem ativou e o coringa fica guardado");
   console.log("ok coringa rouba depois"); }
+// escolha de wild card com jogador que já saiu do elenco não trava a confirmação
+{ const S5 = E.newGame("T5", "h", "Host", "Host FC", "online"); S5.managers[0].roster = [1, 2, 3, 4]; S5.phase = "keep"; S5.keep = { sub: {}, maxWC: 2, maxKeep: 3 };
+  S5.managers.push(Object.assign({}, S5.managers[0], { pid: "b", cpu: true, roster: [5, 6] })); S5.keep.sub[1] = { wc: [5], keep: [6] };
+  S5.settings.wc = 2; S5.settings.picks = 6;
+  const okk = E.applyAction(S5, { t: "keep", k: { wc: [99, 1], keep: [2] }, mi: 0 }, 0, true, Date.now());
+  ok(okk !== false && S5.managers[0].wc.length === 1 && S5.managers[0].wc[0] === 1, "wild card antigo (fora do elenco) é ignorado e o resto vale");
+  console.log("ok keep com jogador trocado"); }

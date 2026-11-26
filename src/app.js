@@ -1710,7 +1710,10 @@ function viewKeep() {
   const mi = UI.kpMi, m = mi != null ? S.managers[mi] : null;
   let box = "";
   if (m) {
-    const d = UI.kp[mi] = UI.kp[mi] || { wc: [], keep: [] };
+    // escolhas desta janela só: as da temporada passada (ou de jogador que saiu do elenco) não contam mais
+    const kkey = (S.career ? S.career.year : 0) + "-" + (k.deadline || 0);
+    let d = UI.kp[mi]; if (!d || d.key !== kkey) d = UI.kp[mi] = { key: kkey, wc: [], keep: [] };
+    d.wc = d.wc.filter(id => m.roster.includes(id)); d.keep = d.keep.filter(id => m.roster.includes(id));
     const sent = !!k.sub[mi];
     box = `<div class="card" style="display:grid;gap:10px">
       ${mis.length > 1 ? `<div class="row"><span class="muted">Escolhendo:</span>${mis.map(i => `<button class="btn sm ${i === mi ? "gold" : ""}" data-a="kpmi" data-mi="${i}">${esc(S.managers[i].team)}</button>`).join("")}</div>` : ""}
